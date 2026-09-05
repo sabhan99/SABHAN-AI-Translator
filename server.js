@@ -1,15 +1,3 @@
-// SABHAN AI - FREE Image Translation & Text Replacement Server
-// -----------------------------------------------------------------
-// Uses only free/open-source tools - no paid API required:
-//   - Tesseract.js  -> OCR (detects text + its location in the image)
-//   - LibreTranslate -> free machine translation API
-//   - sharp         -> draws translated text back onto the image
-//
-// NOTE: Free tools are less accurate than paid AI models, especially
-// with stylized fonts, curved text, or busy backgrounds. Expect lower
-// quality than a paid solution (e.g. OpenAI vision models).
-// -----------------------------------------------------------------
-
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
@@ -21,8 +9,6 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Free public LibreTranslate instance (can be overridden with env var
-// LIBRETRANSLATE_URL if you self-host your own free instance later).
 const LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || 'https://libretranslate.de';
 
 app.use(cors());
@@ -31,10 +17,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-// Map friendly language names (used in the UI) to ISO codes.
 const LANG_CODES = {
   Arabic: 'ar',
   English: 'en',
@@ -54,9 +39,8 @@ function escapeXML(str = '') {
     .replace(/'/g, '&apos;');
 }
 
-// Run OCR with Tesseract.js and return line-level text blocks with boxes.
 async function runOCR(buffer) {
-  const worker = await createWorker('eng+ara'); // supports English + Arabic source text
+  const worker = await createWorker('eng+ara+spa+tur+fra');
   try {
     const { data } = await worker.recognize(buffer);
     const lines = (data.lines || [])
@@ -74,7 +58,6 @@ async function runOCR(buffer) {
   }
 }
 
-// Translate a single string using the free LibreTranslate API.
 async function translateText(text, targetCode) {
   try {
     const res = await fetch(`${LIBRETRANSLATE_URL}/translate`, {
@@ -92,7 +75,7 @@ async function translateText(text, targetCode) {
     return json.translatedText || text;
   } catch (err) {
     console.error('Translation failed for line, using original text:', err.message);
-    return text; // graceful fallback: keep original text if translation fails
+    return text;
   }
 }
 
@@ -140,22 +123,18 @@ app.post('/api/translate', upload.single('image'), async (req, res) => {
     const width = meta.width;
     const height = meta.height;
 
-    // 1) OCR - find text and where it is
     const lines = await runOCR(req.file.buffer);
 
     if (lines.length === 0) {
-      // No text found - just return the original image
       const outputBuffer = await sharp(req.file.buffer).png().toBuffer();
       res.set('Content-Type', 'image/png');
       return res.send(outputBuffer);
     }
 
-    // 2) Translate each detected line (free API, one request per line)
     for (const line of lines) {
       line.translated = await translateText(line.text, targetCode);
     }
 
-    // 3) Draw translated text back onto the image
     const overlaySVG = buildOverlaySVG(width, height, lines, rtl);
     const outputBuffer = await sharp(req.file.buffer)
       .composite([{ input: Buffer.from(overlaySVG), top: 0, left: 0 }])
