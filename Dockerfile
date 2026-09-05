@@ -5,7 +5,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libvips-dev \
     fontconfig \
-    fonts-noto-core \
+    fonts-noto-naskh-arabic \
+    fonts-kacst \
     fonts-dejavu-core \
     && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
