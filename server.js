@@ -2,15 +2,11 @@ const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
 const sharp = require('sharp');
-const fetch = require('node-fetch');
 const { createWorker } = require('tesseract.js');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-const LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || // استخدام محرك ترجمة مجاني ومستقر
-
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
@@ -41,7 +37,7 @@ function escapeXML(str = '') {
 }
 
 async function runOCR(buffer) {
-  const worker = await createWorker('eng+ara+spa+tur+fra');
+  const worker = await createWorker('eng');
   try {
     const { data } = await worker.recognize(buffer);
     const lines = (data.lines || [])
@@ -75,11 +71,6 @@ async function translateText(text, targetCode) {
     return text;
   }
 }
- catch (err) {
-    console.error('Translation failed for line, using original text:', err.message);
-    return text;
-  }
-}
 
 function buildOverlaySVG(width, height, blocks, rtl) {
   const rects = [];
@@ -94,14 +85,14 @@ function buildOverlaySVG(width, height, blocks, rtl) {
 
     rects.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="white" />`);
 
-    const fsiz = Math.max(10, Math.min(Math.round(h * 0.6), Math.floor(h * 0.9), 72));
+    const fsiz = Math.max(12, Math.min(Math.round(h * 0.65), 48));
     const textX = rtl ? x + w - 4 : x + 4;
     const anchor = rtl ? 'end' : 'start';
     const textY = y + h / 2 + fsiz / 3;
 
     texts.push(
       `<text x="${textX}" y="${textY}" font-size="${fsiz}" fill="black" ` +
-      `text-anchor="${anchor}" font-family="Arial, sans-serif" ` +
+      `text-anchor="${anchor}" font-family="sans-serif" ` +
       `direction="${rtl ? 'rtl' : 'ltr'}">${text}</text>`
     );
   }
@@ -117,7 +108,8 @@ app.post('/api/translate', upload.single('image'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image uploaded.' });
     }
-    const targetLangName = req.body.targetLang || 'Arabic';
+    
+    const targetLangName = req.body.targetLang || req.body.lang || 'Arabic';
     const targetCode = LANG_CODES[targetLangName] || 'ar';
     const rtl = RTL_CODES.has(targetCode);
 
@@ -154,5 +146,6 @@ app.post('/api/translate', upload.single('image'), async (req, res) => {
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
-  console.log(`SABHAN AI (FREE version) server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
+
