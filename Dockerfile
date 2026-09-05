@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fontconfig \
     fonts-noto-core \
     fonts-dejavu-core \
+    && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
