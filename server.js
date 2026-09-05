@@ -116,7 +116,7 @@ function buildOverlaySVG(width, height, blocks, rtl) {
 
     texts.push(
       `<text x="${textX}" y="${textY}" font-size="${fsiz}" fill="black" ` +
-      `text-anchor="${anchor}" font-family="Noto Sans Arabic, Noto Sans, DejaVu Sans, sans-serif" ` +
+      `text-anchor="${anchor}" font-family="Noto Naskh Arabic, KacstOne, DejaVu Sans, sans-serif" ` +
       `direction="${rtl ? 'rtl' : 'ltr'}">${text}</text>`
     );
   }
