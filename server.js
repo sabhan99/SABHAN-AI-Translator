@@ -9,7 +9,8 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || 'https://libretranslate.de';
+const LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || // استخدام محرك ترجمة مجاني ومستقر
+
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
@@ -60,20 +61,21 @@ async function runOCR(buffer) {
 
 async function translateText(text, targetCode) {
   try {
-    const res = await fetch(`${LIBRETRANSLATE_URL}/translate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        q: text,
-        source: 'auto',
-        target: targetCode,
-        format: 'text',
-      }),
-    });
-    if (!res.ok) throw new Error(`LibreTranslate HTTP ${res.status}`);
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetCode}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    return json.translatedText || text;
+    
+    if (json && json[0]) {
+      return json[0].map(item => item[0]).join('');
+    }
+    return text;
   } catch (err) {
+    console.error('Translation failed:', err.message);
+    return text;
+  }
+}
+ catch (err) {
     console.error('Translation failed for line, using original text:', err.message);
     return text;
   }
