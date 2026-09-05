@@ -1,7 +1,7 @@
 {
-  "name": "sabhan-ai-translator",
+  "name": "sabhan-ai-translator-free",
   "version": "1.0.0",
-  "description": "SABHAN AI - Image translation and text replacement",
+  "description": "SABHAN AI - Free image translation (Tesseract.js OCR + LibreTranslate)",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -11,8 +11,8 @@
     "express": "^4.19.2",
     "multer": "^1.4.5-lts.1",
     "sharp": "^0.33.4",
-    "openai": "^4.56.0",
-    "dotenv": "^16.4.5",
+    "tesseract.js": "^5.1.0",
+    "node-fetch": "^2.7.0",
     "cors": "^2.8.5"
   },
   "engines": {

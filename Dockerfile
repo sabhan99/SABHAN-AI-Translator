@@ -2,6 +2,7 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
+# System libs needed by sharp (image processing)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libvips-dev \
     && rm -rf /var/lib/apt/lists/*
