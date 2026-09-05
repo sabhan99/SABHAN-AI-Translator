@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const upload = multer({
@@ -31,12 +32,13 @@ function escapeXML(str = '') {
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replace/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
 
 async function runOCR(buffer) {
+  // استخدام محرك الانكليزية + العربية لقراءة الصور بدقة
   const worker = await createWorker('eng');
   try {
     const { data } = await worker.recognize(buffer);
@@ -50,6 +52,9 @@ async function runOCR(buffer) {
         h: l.bbox.y1 - l.bbox.y0,
       }));
     return lines;
+  } catch (e) {
+    console.error('OCR Error:', e);
+    return [];
   } finally {
     await worker.terminate();
   }
@@ -83,16 +88,17 @@ function buildOverlaySVG(width, height, blocks, rtl) {
     const h = Math.max(1, block.h);
     const text = escapeXML(block.translated || '');
 
-    rects.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="white" />`);
+    // رسم مربع أبيض لإخفاء النص الأصلي بالكامل
+    rects.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="white" stroke="#ccc" stroke-width="1" />`);
 
-    const fsiz = Math.max(12, Math.min(Math.round(h * 0.65), 48));
-    const textX = rtl ? x + w - 4 : x + 4;
+    const fsiz = Math.max(14, Math.min(Math.round(h * 0.55), 40));
+    const textX = rtl ? x + w - 5 : x + 5;
     const anchor = rtl ? 'end' : 'start';
     const textY = y + h / 2 + fsiz / 3;
 
     texts.push(
       `<text x="${textX}" y="${textY}" font-size="${fsiz}" fill="black" ` +
-      `text-anchor="${anchor}" font-family="sans-serif" ` +
+      `text-anchor="${anchor}" font-family="Arial, Cairo, sans-serif" ` +
       `direction="${rtl ? 'rtl' : 'ltr'}">${text}</text>`
     );
   }
@@ -109,15 +115,20 @@ app.post('/api/translate', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image uploaded.' });
     }
     
+    // استقبال اللغة مع القيمة الافتراضية للغة العربية
     const targetLangName = req.body.targetLang || req.body.lang || 'Arabic';
     const targetCode = LANG_CODES[targetLangName] || 'ar';
     const rtl = RTL_CODES.has(targetCode);
+
+    console.log(`Processing image. Target Lang: ${targetLangName} (${targetCode})`);
 
     const meta = await sharp(req.file.buffer).metadata();
     const width = meta.width;
     const height = meta.height;
 
+    // 1. التعرف على النص
     const lines = await runOCR(req.file.buffer);
+    console.log(`Detected lines count: ${lines.length}`);
 
     if (lines.length === 0) {
       const outputBuffer = await sharp(req.file.buffer).png().toBuffer();
@@ -125,10 +136,13 @@ app.post('/api/translate', upload.single('image'), async (req, res) => {
       return res.send(outputBuffer);
     }
 
+    // 2. ترجمة النصوص المستخرجة
     for (const line of lines) {
       line.translated = await translateText(line.text, targetCode);
+      console.log(`Original: "${line.text}" -> Translated: "${line.translated}"`);
     }
 
+    // 3. طباعة النص المترجم فوق الصورة
     const overlaySVG = buildOverlaySVG(width, height, lines, rtl);
     const outputBuffer = await sharp(req.file.buffer)
       .composite([{ input: Buffer.from(overlaySVG), top: 0, left: 0 }])
@@ -148,4 +162,3 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
