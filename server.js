@@ -1,23 +1,40 @@
+// SABHAN AI - FREE Image Translation & Text Replacement Server
+// -----------------------------------------------------------------
+// Uses only free/open-source tools - no paid API required:
+//   - Tesseract.js  -> OCR (detects text + its location in the image)
+//   - LibreTranslate -> free machine translation API
+//   - sharp         -> draws translated text back onto the image
+//
+// NOTE: Free tools are less accurate than paid AI models, especially
+// with stylized fonts, curved text, or busy backgrounds. Expect lower
+// quality than a paid solution (e.g. OpenAI vision models).
+// -----------------------------------------------------------------
+
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
 const sharp = require('sharp');
+const fetch = require('node-fetch');
 const { createWorker } = require('tesseract.js');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Free public LibreTranslate instance (can be overridden with env var
+// LIBRETRANSLATE_URL if you self-host your own free instance later).
+const LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || 'https://libretranslate.de';
+
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
+// Map friendly language names (used in the UI) to ISO codes.
 const LANG_CODES = {
   Arabic: 'ar',
   English: 'en',
@@ -32,14 +49,14 @@ function escapeXML(str = '') {
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace/>/g, '&gt;')
+    .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
 
+// Run OCR with Tesseract.js and return line-level text blocks with boxes.
 async function runOCR(buffer) {
-  // استخدام محرك الانكليزية + العربية لقراءة الصور بدقة
-  const worker = await createWorker('eng');
+  const worker = await createWorker('eng+ara+spa+tur+fra'); // supports Arabic, English, Spanish, Turkish, French source text
   try {
     const { data } = await worker.recognize(buffer);
     const lines = (data.lines || [])
@@ -52,28 +69,30 @@ async function runOCR(buffer) {
         h: l.bbox.y1 - l.bbox.y0,
       }));
     return lines;
-  } catch (e) {
-    console.error('OCR Error:', e);
-    return [];
   } finally {
     await worker.terminate();
   }
 }
 
+// Translate a single string using the free LibreTranslate API.
 async function translateText(text, targetCode) {
   try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetCode}&dt=t&q=${encodeURIComponent(text)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await fetch(`${LIBRETRANSLATE_URL}/translate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: text,
+        source: 'auto',
+        target: targetCode,
+        format: 'text',
+      }),
+    });
+    if (!res.ok) throw new Error(`LibreTranslate HTTP ${res.status}`);
     const json = await res.json();
-    
-    if (json && json[0]) {
-      return json[0].map(item => item[0]).join('');
-    }
-    return text;
+    return json.translatedText || text;
   } catch (err) {
-    console.error('Translation failed:', err.message);
-    return text;
+    console.error('Translation failed for line, using original text:', err.message);
+    return text; // graceful fallback: keep original text if translation fails
   }
 }
 
@@ -88,17 +107,16 @@ function buildOverlaySVG(width, height, blocks, rtl) {
     const h = Math.max(1, block.h);
     const text = escapeXML(block.translated || '');
 
-    // رسم مربع أبيض لإخفاء النص الأصلي بالكامل
-    rects.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="white" stroke="#ccc" stroke-width="1" />`);
+    rects.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="white" />`);
 
-    const fsiz = Math.max(14, Math.min(Math.round(h * 0.55), 40));
-    const textX = rtl ? x + w - 5 : x + 5;
+    const fsiz = Math.max(10, Math.min(Math.round(h * 0.6), Math.floor(h * 0.9), 72));
+    const textX = rtl ? x + w - 4 : x + 4;
     const anchor = rtl ? 'end' : 'start';
     const textY = y + h / 2 + fsiz / 3;
 
     texts.push(
       `<text x="${textX}" y="${textY}" font-size="${fsiz}" fill="black" ` +
-      `text-anchor="${anchor}" font-family="Arial, Cairo, sans-serif" ` +
+      `text-anchor="${anchor}" font-family="Arial, sans-serif" ` +
       `direction="${rtl ? 'rtl' : 'ltr'}">${text}</text>`
     );
   }
@@ -114,35 +132,30 @@ app.post('/api/translate', upload.single('image'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image uploaded.' });
     }
-    
-    // استقبال اللغة مع القيمة الافتراضية للغة العربية
-    const targetLangName = req.body.targetLang || req.body.lang || 'Arabic';
+    const targetLangName = req.body.targetLang || 'Arabic';
     const targetCode = LANG_CODES[targetLangName] || 'ar';
     const rtl = RTL_CODES.has(targetCode);
-
-    console.log(`Processing image. Target Lang: ${targetLangName} (${targetCode})`);
 
     const meta = await sharp(req.file.buffer).metadata();
     const width = meta.width;
     const height = meta.height;
 
-    // 1. التعرف على النص
+    // 1) OCR - find text and where it is
     const lines = await runOCR(req.file.buffer);
-    console.log(`Detected lines count: ${lines.length}`);
 
     if (lines.length === 0) {
+      // No text found - just return the original image
       const outputBuffer = await sharp(req.file.buffer).png().toBuffer();
       res.set('Content-Type', 'image/png');
       return res.send(outputBuffer);
     }
 
-    // 2. ترجمة النصوص المستخرجة
+    // 2) Translate each detected line (free API, one request per line)
     for (const line of lines) {
       line.translated = await translateText(line.text, targetCode);
-      console.log(`Original: "${line.text}" -> Translated: "${line.translated}"`);
     }
 
-    // 3. طباعة النص المترجم فوق الصورة
+    // 3) Draw translated text back onto the image
     const overlaySVG = buildOverlaySVG(width, height, lines, rtl);
     const outputBuffer = await sharp(req.file.buffer)
       .composite([{ input: Buffer.from(overlaySVG), top: 0, left: 0 }])
@@ -160,5 +173,5 @@ app.post('/api/translate', upload.single('image'), async (req, res) => {
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`SABHAN AI (FREE version) server running on port ${PORT}`);
 });

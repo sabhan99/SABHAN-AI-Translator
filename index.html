@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SABHAN — ترجمة النصوص داخل الصور</title>
+<meta name="description" content="ارفع صورة، اختر اللغة، واحصل على نسخة مترجمة فورًا. يدعم العربية والإنجليزية والفرنسية والإسبانية والتركية." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #0e1116;
+    --ink-soft: #161b24;
+    --ink-line: #262c38;
+    --gold: #c9a227;
+    --gold-soft: #e4c766;
+    --parchment: #ede3cf;
+    --wine: #7a2331;
+    --text: #eae6dc;
+    --text-muted: #a9a290;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: 'Cairo', system-ui, sans-serif;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 56px 20px 40px;
+  }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    text-align: center;
+    max-width: 560px;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: rise .7s ease-out forwards;
+  }
+
+  @keyframes rise {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .wordmark {
+    font-family: 'Amiri', serif;
+    font-weight: 700;
+    font-size: clamp(2.75rem, 9vw, 4.5rem);
+    letter-spacing: 0.02em;
+    color: var(--gold-soft);
+    margin: 0;
+    line-height: 1;
+  }
+
+  .tagline {
+    margin: 14px 0 0;
+    font-size: clamp(1rem, 2.4vw, 1.15rem);
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .divider {
+    width: 0;
+    height: 1px;
+    margin: 28px auto 0;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    position: relative;
+    animation: grow 1s .3s ease-out forwards;
+  }
+
+  @keyframes grow { to { width: 220px; } }
+
+  .divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 7px;
+    height: 7px;
+    background: var(--gold);
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  .langs {
+    margin: 22px 0 0;
+    font-size: 0.92rem;
+    color: var(--text-muted);
+  }
+
+  /* ---------- tool card ---------- */
+
+  .card {
+    width: 100%;
+    max-width: 440px;
+    margin-top: 40px;
+    background: var(--ink-soft);
+    border: 1px solid var(--ink-line);
+    border-radius: var(--radius);
+    padding: 28px;
+  }
+
+  .field { margin-bottom: 20px; }
+  .field:last-of-type { margin-bottom: 0; }
+
+  .field label {
+    display: block;
+    font-size: 0.92rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .dropzone {
+    border: 1.5px dashed var(--ink-line);
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+    background: rgba(237, 227, 207, 0.03);
+  }
+
+  .dropzone:hover,
+  .dropzone.drag {
+    border-color: var(--gold);
+    background: rgba(201, 162, 39, 0.06);
+  }
+
+  .dropzone input { display: none; }
+
+  .dropzone .dz-label {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+  }
+
+  .dropzone .dz-filename {
+    color: var(--gold-soft);
+    font-weight: 600;
+  }
+
+  select {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--ink-line);
+    background: var(--ink);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.98rem;
+    appearance: none;
+  }
+
+  select:focus, .dropzone:focus-within {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+  }
+
+  button.primary {
+    width: 100%;
+    margin-top: 24px;
+    padding: 13px;
+    border: none;
+    border-radius: 10px;
+    background: var(--gold);
+    color: #1c1503;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 1.02rem;
+    cursor: pointer;
+    transition: background .15s ease, transform .1s ease;
+  }
+
+  button.primary:hover { background: var(--gold-soft); }
+  button.primary:active { transform: scale(0.98); }
+  button.primary:disabled { opacity: 0.55; cursor: not-allowed; }
+  button.primary:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 3px; }
+
+  .status {
+    margin-top: 16px;
+    font-size: 0.9rem;
+    color: var(--gold-soft);
+    text-align: center;
+    min-height: 1.2em;
+  }
+
+  .status.error { color: var(--wine); }
+
+  /* ---------- result ---------- */
+
+  .result {
+    width: 100%;
+    max-width: 440px;
+    margin-top: 20px;
+  }
+
+  .result img {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--parchment);
+  }
+
+  .result a.download {
+    display: block;
+    text-align: center;
+    margin-top: 12px;
+    padding: 11px;
+    border-radius: 10px;
+    border: 1px solid var(--gold);
+    color: var(--gold-soft);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .result a.download:hover { background: rgba(201, 162, 39, 0.08); }
+
+  footer {
+    margin-top: 48px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero, .divider { animation: none; opacity: 1; transform: none; width: 220px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="hero">
+    <h1 class="wordmark">SABHAN</h1>
+    <p class="tagline">ترجمة النصوص داخل الصور بلمسة واحدة</p>
+    <div class="divider"></div>
+    <p class="langs">العربية، الإنجليزية، الفرنسية، الإسبانية، التركية</p>
+  </div>
+
+  <form class="card" id="form">
+    <div class="field">
+      <label for="fileInput">الصورة</label>
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <span class="dz-label" id="dzLabel">اضغط لاختيار صورة أو اسحبها هنا</span>
+        <input type="file" id="fileInput" accept="image/*" required />
+      </label>
+    </div>
+
+    <div class="field">
+      <label for="lang">اللغة الهدف</label>
+      <select id="lang">
+        <option value="Arabic">العربية</option>
+        <option value="English">الإنجليزية</option>
+        <option value="French">الفرنسية</option>
+        <option value="Spanish">الإسبانية</option>
+        <option value="Turkish">التركية</option>
+      </select>
+    </div>
+
+    <button type="submit" class="primary" id="submitBtn">ترجم الصورة</button>
+    <p class="status" id="status"></p>
+  </form>
+
+  <div class="result" id="result"></div>
+
+  <footer>SABHAN · أداة مجانية لترجمة الصور</footer>
+
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const dzLabel = document.getElementById('dzLabel');
+  const form = document.getElementById('form');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const submitBtn = document.getElementById('submitBtn');
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) {
+      dzLabel.innerHTML = 'تم اختيار: <span class="dz-filename">' + fileInput.files[0].name + '</span>';
+    }
+  });
+
+  ['dragover', 'dragleave', 'drop'].forEach((evt) => {
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.toggle('drag', evt === 'dragover');
+      if (evt === 'drop' && e.dataTransfer.files[0]) {
+        fileInput.files = e.dataTransfer.files;
+        dzLabel.innerHTML = 'تم اختيار: <span class="dz-filename">' + e.dataTransfer.files[0].name + '</span>';
+      }
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const file = fileInput.files[0];
+    const lang = document.getElementById('lang').value;
+    if (!file) return;
+
+    submitBtn.disabled = true;
+    status.classList.remove('error');
+    status.textContent = 'جاري المعالجة… قد يستغرق نصف دقيقة';
+    result.innerHTML = '';
+
+    const fd = new FormData();
+    fd.append('image', file);
+    fd.append('targetLang', lang);
+
+    try {
+      const res = await fetch('/api/translate', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'تعذّر إتمام الترجمة');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      result.innerHTML =
+        '<img src="' + url + '" alt="الصورة المترجمة" />' +
+        '<a class="download" href="' + url + '" download="translated.png">تنزيل الصورة</a>';
+      status.textContent = 'تمت الترجمة بنجاح';
+    } catch (err) {
+      status.classList.add('error');
+      status.textContent = err.message;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
